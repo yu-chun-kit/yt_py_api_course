@@ -1,6 +1,6 @@
 from random import randrange
 from typing import Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel
 
@@ -29,24 +29,37 @@ def find_post_by_id(id: int):
     return None
 
 
+def find_index_post(id: int):
+    for index, post in enumerate(my_posts):
+        if post["id"] == id:
+            return index
+    return None
+
+
+@app.get("/")
+def root():
+    return {"message": "Hello World"}
+
+
 # generate crud logic of post(include get all of the post), but not include rating
 @app.post("/posts")
 async def create_post(post: Post):
     post_dict = post.dict()
     post_dict["id"] = randrange(0, 1_000_000)
-    # post_dict["id"] = len(my_posts)
     my_posts.append(post)
     return post
 
 
 @app.get("/posts/{id}")
-async def get_post(id: int):
+async def get_post(id: int, response: Response):
     print(type(id))
     # filter and find first post by id
     post = find_post_by_id(id)
-    if post != None:
-        return {"post_detail": post}
-    return {"error": "post not found"}
+    if not post:
+        raise HTTPException(status_code=404, detail=f"post not found with id: {id}")
+        # response.status_code = status.HTTP_404_NOT_FOUND
+        # return {"message": "post not found with id: {id}"}
+    return {"post_detail": post}
 
 
 @app.get("/posts")
@@ -57,16 +70,21 @@ async def get_posts():
 @app.put("/posts/{id}")
 async def update_post(id: int, post: Post):
     curr_post = find_post_by_id(id)
-    if curr_post != None:
-        curr_post = post
-        curr_post.id = id
-        return curr_post
-    return {"error": "post not found"}
+    if not curr_post:
+        raise HTTPException(status_code=404, detail=f"post not found with id: {id}")
+    # if curr_post != None:
+    #     curr_post = post
+    #     curr_post.id = id
+    #     return curr_post
+    my_posts.index(curr_post)["title"] = post.title
+    my_posts.index(curr_post)["id"] = id
+    return curr_post
 
 
 @app.delete("/posts/{id}")
 async def delete_post(id: int):
-    return my_posts.pop(id)
+    index = find_index_post(id)
+    return my_posts.pop(index)
 
 
 @app.get("/posts/latest")
